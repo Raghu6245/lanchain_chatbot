@@ -1,0 +1,205 @@
+"""
+COMPREHENSIVE CHATBOT IMPLEMENTATION PROMPT
+==========================================
+
+Build a 3-Agent LLM System for Synthetic Health Insurance Data Generation
+
+OVERVIEW:
+Create a conversational chatbot that collects user requirements through natural language 
+and generates JSON files for synthetic health insurance data. The system should handle 
+single-turn input with intelligent extraction, validation, and JSON generation.
+
+TECHNICAL ARCHITECTURE:
+- Framework: LangChain + LangGraph for agent coordination
+- Agents: 3 specialized agents (Extraction, Validation, JSON Generation)
+- LLM: OpenAI API (company-compliant, no local models)
+- UI: Streamlit interface
+- State Management: LangGraph StateGraph with shared state
+
+CORE REQUIREMENTS:
+
+1. INPUT METHOD:
+   - Single comprehensive input from user
+   - Handle natural language variations and misspellings
+   - Support multiple input formats:
+     * "CA 600, TX 400"
+     * "California 600 records, Texas 400 records" 
+     * "600 for CA and 400 for TX"
+   - Intelligent mapping to valid configuration values
+
+2. REQUIRED DATA FIELDS (ALL MANDATORY except spouse):
+   
+   a) BASIC INFO:
+   - username: Alphanumeric only (strip special characters)
+   - numberOfRecords: Integer (1-10000)
+   - env: V2/F2/G2 (map from V2/F2/G2)
+   - UserType: FEPOC/NON-FEPOC
+   
+   b) GEOGRAPHIC:
+   - statePercentage: US state codes (all 50 states from STATE_MAPPINGS config)
+     Format: [{"state": "CA", "count": "600"}, {"state": "TX", "count": "400"}]
+   
+   c) DEMOGRAPHICS:
+   - subscriberGender: M/F/EMPTY with counts
+     Format: [{"gender": "M", "count": "700"}, {"gender": "F", "count": "300"}, {"gender": "EMPTY", "count": "0"}]
+   
+   d) INSURANCE:
+   - enrollmentCode: From ENROLLMENT_MAP config with counts
+     Format: [{"enrollmentCode": "105", "count": "1000"}]
+   - memberAge: over65/under65/Any with bracket/age types
+     Format: [{"age": "over65", "type": "bracket", "count": "200"}, {"age": "under65", "type": "bracket", "count": "800"}, {"age": "Any", "type": "age", "count": "0"}]
+   
+   e) FAMILY (CONDITIONAL):
+   - dependentAge: Child types with counts (conditional on enrollment)
+     Format: [{"childType": "CHILD_MINOR", "count": "600"}, {"childType": "CHILD_MAJOR", "count": "400"}]
+   - spouseAge: Spouse types with counts (optional)
+     Format: [{"spouseType": "SPOUSE_UNDER65", "count": "300"}, {"spouseType": "EMPTY", "count": "700"}]
+
+3. FAMILY DETAILS LOGIC:
+   
+   IF enrollment type contains "Self Only":
+   → dependentAge = [{"childType": "EMPTY", "count": str(numberOfRecords)}]
+   → spouseAge = [{"spouseType": "EMPTY", "count": str(numberOfRecords)}]
+   
+   IF enrollment type contains "Self + 1" OR "Self + Family":
+   → dependentAge = MANDATORY (user must provide valid child type counts)
+   → spouseAge = OPTIONAL (if not provided, auto-fill with EMPTY counts)
+
+4. CONFIGURATION VALIDATION:
+   Must reference and validate against these config values:
+   
+   - STATES: All values from STATE_MAPPINGS (50 US states + DC)
+   - ENROLLMENTS: All values from ENROLLMENT_MAP 
+   - CHILD_TYPES: CHILD_NEW_BORN, CHILD_MINOR, CHILD_MAJOR, CHILD_UNDER_13, CHILD_OVER_13, EMPTY
+   - SPOUSE_TYPES: SPOUSE_UNDER65, SPOUSE_OVER65, EMPTY
+   - MEMBER_AGE: over65, under65, Any
+   - GENDER: M, F, EMPTY
+   - ENVIRONMENT: DEV, STAGE, PROD
+
+5. COUNT VALIDATION (CRITICAL REQUIREMENT):
+   
+   ALL count fields must sum exactly to numberOfRecords:
+   
+   Example: numberOfRecords = 1000
+   - statePercentage counts: CA(600) + TX(400) = 1000 ✓
+   - subscriberGender counts: M(700) + F(300) = 1000 ✓
+   - enrollmentCode counts: Must sum to 1000 ✓
+   - memberAge counts: over65(200) + under65(800) + Any(0) = 1000 ✓
+   - dependentAge counts: Must sum to 1000 ✓ (if required)
+   - spouseAge counts: Must sum to 1000 ✓
+   
+   If counts don't match:
+   → Calculate exact deficit: "You need 100 more records for [field]. How should I distribute them?"
+   → Ask for specific distribution of missing counts
+
+6. JSON OUTPUT FORMAT:
+   
+   - All counts stored as STRINGS ("600" not 600)
+   - Must match exact json_template.json structure
+   - File naming: {username}_data_{timestamp}.json
+   - Save to generated_files/ directory
+   
+   Template structure:
+   {
+     "userId": "string",
+     "env": "string", 
+     "UserType": "string",
+     "numberOfRecords": "string",
+     "statePercentage": [{"state": "string", "count": "string"}],
+     "subscriberGender": [{"gender": "string", "count": "string"}],
+     "enrollmentCode": [{"enrollmentCode": "string", "count": "string"}],
+     "memberAge": [{"age": "string", "type": "string", "count": "string"}],
+     "dependentAge": [{"childType": "string", "count": "string"}],
+     "spouseAge": [{"spouseType": "string", "count": "string"}],
+     "optionalEntries": []
+   }
+
+AGENT ARCHITECTURE:
+
+1. EXTRACTION AGENT:
+   - Single comprehensive extraction prompt
+   - Handle all natural language variations
+   - Map user input to valid config values
+   - Extract ALL possible entities in one pass
+   - Return structured data with confidence scores
+   
+2. VALIDATION AGENT:
+   - Validate field completeness (all required fields present)
+   - Validate count sums (all fields sum to numberOfRecords)
+   - Validate against config values (states, enrollments, etc.)
+   - Check family details conditional logic
+   - Generate specific error messages for missing/incorrect data
+   
+3. JSON GENERATOR AGENT:
+   - Map validated data to exact JSON template structure
+   - Convert all counts to strings
+   - Handle conditional family details logic
+   - Generate timestamped filename
+   - Save to file system
+
+LANGGRAPH WORKFLOW:
+user_input → extract → validate → [complete?] → generate_json
+                                      ↓ [incomplete]
+                                 generate_followup
+
+STREAMLIT INTERFACE:
+- Single chat interface
+- Display conversation history
+- Show extracted data in sidebar (for debugging)
+- Handle file download/display
+
+ERROR HANDLING:
+- Spelling tolerance and intelligent mapping
+- Missing data identification and specific requests
+- Count mismatch calculation and resolution
+- Config validation with suggestions
+- Graceful fallbacks for all error scenarios
+
+EXAMPLE USER INTERACTIONS:
+
+Good Complete Input:
+"Hi john123, need 1000 records FOR V2, Non-Fepoc, California 600 Texas 400, male 700 female 300, FEPOC Standard Self+Family 1000, under65 800 over65 200, minor children 600 major children 400, spouse under65 300 empty spouse 700"
+
+Incomplete Input:
+"I'm sarah, need 500 records for production with mostly California and some Texas"
+→ System should ask for specific counts and missing details
+
+Count Mismatch:
+"john123, 1000 records, CA 600 TX 300" (only 900 total)
+→ "You specified 900 records but requested 1000. You need 100 more records. Should I add them to CA, TX, or another state?"
+
+IMPLEMENTATION CHECKLIST:
+□ Set up LangChain with OpenAI API
+□ Create 3 specialized agent classes
+□ Implement LangGraph workflow with conditional routing
+□ Load and validate against config files (STATE_MAPPINGS, ENROLLMENT_MAP, etc.)
+□ Implement strict count validation logic
+□ Create comprehensive extraction prompts
+□ Handle family details conditional logic
+□ Implement JSON generation with string counts
+□ Create Streamlit interface
+□ Add error handling and recovery
+□ Test with various input scenarios
+
+TESTING SCENARIOS:
+1. Complete single input with all details
+2. Incomplete input requiring follow-up
+3. Count mismatches requiring correction
+4. Misspelled states/enrollments
+5. Self Only vs Self+Family enrollment logic
+6. Edge cases (zero counts, maximum records, etc.)
+
+SUCCESS CRITERIA:
+- Handle natural language input with 95%+ accuracy
+- Validate all counts sum to numberOfRecords
+- Generate perfect JSON matching template
+- Provide intelligent follow-up questions
+- Work in company environment (no local models)
+- Process requests in 1-3 conversation turns maximum
+
+COMPANY COMPLIANCE:
+- No local model downloads required
+- API-based LLM calls only
+- Works behind corporate firewalls
+- Minimal dependencies (LangChain, OpenAI, Streamlit)
+"""

@@ -1,0 +1,21 @@
+# Health Insurance Data Generator - Requirements
+# ============================================
+# Compatible versions tested together
+
+# Core LangChain and AI - Compatible set
+langchain==0.3.10
+langchain-openai==0.2.11
+langchain-core==0.3.40
+langgraph==0.2.62
+
+# Streamlit for UI  
+streamlit==1.51.0
+
+# Data handling
+pydantic==2.12.4
+
+# Utilities
+python-dotenv==1.0.0
+
+# Additional dependencies
+typing-extensions>=4.5.0

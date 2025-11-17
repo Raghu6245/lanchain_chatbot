@@ -1,0 +1,48 @@
+{
+  "userId": "test_user",
+  "env": "V2",
+  "UserType": "NON-FEPOC",
+  "numberOfRecords": "100",
+  "statePercentage": [
+    {
+      "state": "CA",
+      "count": "100"
+    }
+  ],
+  "subscriberGender": [
+    {
+      "gender": "M",
+      "count": "50"
+    },
+    {
+      "gender": "F",
+      "count": "50"
+    }
+  ],
+  "enrollmentCode": [
+    {
+      "enrollmentCode": "104",
+      "count": "100"
+    }
+  ],
+  "memberAge": [
+    {
+      "age": "under65",
+      "type": "bracket",
+      "count": "100"
+    }
+  ],
+  "dependentAge": [
+    {
+      "childType": "EMPTY",
+      "count": "100"
+    }
+  ],
+  "spouseAge": [
+    {
+      "spouseType": "EMPTY",
+      "count": "100"
+    }
+  ],
+  "optionalEntries": []
+}

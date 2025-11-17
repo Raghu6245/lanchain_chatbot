@@ -1,0 +1,18 @@
+{
+  "userId": "rahul",
+  "env": "V2",
+  "UserType": "FEPOC",
+  "numberOfRecords": "100",
+  "statePercentage": [],
+  "subscriberGender": [],
+  "enrollmentCode": [],
+  "memberAge": [],
+  "dependentAge": [],
+  "spouseAge": [
+    {
+      "spouseType": "EMPTY",
+      "count": "0"
+    }
+  ],
+  "optionalEntries": []
+}

@@ -1,0 +1,87 @@
+{
+  "userId": "raghu",
+  "env": "V2",
+  "UserType": "Non-Fepoc",
+  "numberOfRecords": "14",
+  "statePercentage": [
+    {
+      "state": "CO",
+      "count": "14"
+    }
+  ],
+  "subscriberGender": [
+    {
+      "gender": "M",
+      "count": "0"
+    },
+    {
+      "gender": "F",
+      "count": "14"
+    },
+    {
+      "gender": "EMPTY",
+      "count": "0"
+    }
+  ],
+  "enrollmentCode": [
+    {
+      "enrollmentCode": "106",
+      "count": "14"
+    }
+  ],
+  "memberAge": [
+    {
+      "age": "over65",
+      "type": "bracket",
+      "count": "0"
+    },
+    {
+      "age": "under65",
+      "type": "bracket",
+      "count": "14"
+    },
+    {
+      "age": "Any",
+      "type": "age",
+      "count": "0"
+    }
+  ],
+  "dependentAge": [
+    {
+      "childType": "CHILD_MINOR",
+      "count": "13"
+    },
+    {
+      "childType": "CHILD_MAJOR",
+      "count": "13"
+    },
+    {
+      "childtype": "CHILD_ADULT",
+      "count": "1"
+    },
+
+    {
+      "childType": "CHILD_MINOR",
+      "count": "13"
+    },
+    {
+      "childtype": "EMPTY",
+      "count": "0"
+    }
+  ],
+  "spouseAge": [
+    {
+      "spouseType": "SPOUSE_UNDER65",
+      "count": "1"
+    },
+    {
+      "spouseType": "SPOUSE_OVER65",
+      "count": "0"
+    },
+    {
+      "spouseType": "EMPTY",
+      "count": "0"
+    }
+  ],
+  "optionalEntries": []
+}
