@@ -83,8 +83,8 @@ class JsonGeneratorAgent:
             "subscriberGender": self._format_subscriber_gender(data.get("genders", [])),
             "enrollmentCode": self._format_enrollment_code(data.get("enrollments", [])),
             "memberAge": self._format_member_age(data.get("ages", [])),
-            "dependentAge": self._format_dependent_age(data.get("children", []), data.get("enrollments", [])),
-            "spouseAge": self._format_spouse_age(data.get("spouses", []), data.get("enrollments", [])),
+            "dependentAge": self._format_dependent_age(data.get("children", []), data.get("enrollments", []), data.get("numberOfRecords", 0)),
+            "spouseAge": self._format_spouse_age(data.get("spouses", []), data.get("enrollments", []), data.get("numberOfRecords", 0)),
             "optionalEntries": []
         }
         
@@ -147,7 +147,7 @@ class JsonGeneratorAgent:
             for age in ages
         ]
     
-    def _format_dependent_age(self, children: list, enrollments: list) -> list:
+    def _format_dependent_age(self, children: list, enrollments: list, numberOfRecords: int) -> list:
         """Format dependent age based on enrollment type"""
         
         # Check if enrollment is Self Only
@@ -155,17 +155,21 @@ class JsonGeneratorAgent:
         
         if is_self_only:
             # For Self Only, all dependents should be EMPTY
-            total_records = self._get_total_records_from_enrollments(enrollments)
             return [
                 {
                     "childType": "EMPTY",
-                    "count": str(total_records)
+                    "count": str(numberOfRecords)
                 }
             ]
         
-        # For family enrollments, use provided children data
+        # For family enrollments, use provided children data or auto-fill to EMPTY
         if not children:
-            return []
+            return [
+                {
+                    "childType": "EMPTY", 
+                    "count": str(numberOfRecords)
+                }
+            ]
         
         return [
             {
@@ -175,7 +179,7 @@ class JsonGeneratorAgent:
             for child in children
         ]
     
-    def _format_spouse_age(self, spouses: list, enrollments: list) -> list:
+    def _format_spouse_age(self, spouses: list, enrollments: list, numberOfRecords: int) -> list:
         """Format spouse age based on enrollment type"""
         
         # Check if enrollment is Self Only
@@ -183,21 +187,19 @@ class JsonGeneratorAgent:
         
         if is_self_only:
             # For Self Only, all spouses should be EMPTY
-            total_records = self._get_total_records_from_enrollments(enrollments)
             return [
                 {
                     "spouseType": "EMPTY",
-                    "count": str(total_records)
+                    "count": str(numberOfRecords)
                 }
             ]
         
         # For family enrollments, use provided spouse data or default to EMPTY
         if not spouses:
-            total_records = self._get_total_records_from_enrollments(enrollments)
             return [
                 {
                     "spouseType": "EMPTY",
-                    "count": str(total_records)
+                    "count": str(numberOfRecords)
                 }
             ]
         

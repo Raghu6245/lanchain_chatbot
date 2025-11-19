@@ -6,6 +6,18 @@ Centralized configuration file containing all mappings, constants,
 and default values used across the chatbot application.
 """
 
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# AWS Bedrock Configuration
+AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+BEDROCK_MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "us.meta.llama3-3-70b-instruct-v1:0")
+
 # State mappings for natural language processing
 STATE_MAPPINGS = {
     # Full state names to abbreviations

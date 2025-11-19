@@ -1,30 +1,32 @@
 """
-Validation Agent - Check data completeness and count accuracy
+Validation Agent - Check data completeness and business logic
 ===========================================================
 
-Simple agent with one goal: Validate extracted data is complete and counts sum correctly.
+Simple agent with one goal: Validate business rules for Pydantic-validated data.
+Schema validation happens in ExtractionAgent. This focuses on business logic only.
 """
 
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Union
 from config import (
     ALL_STATES, ALL_ENROLLMENT_CODES, GENDER_TYPES, 
     MEMBER_AGE_TYPES, ALL_CHILD_TYPES, SPOUSE_AGE_OPTIONS,
     ENV_TYPES, USER_TYPES, ENROLLMENT_MAP
 )
+from models.health_insurance_models import HealthInsuranceRequest, ExtractionResult
 
 
 class ValidationAgent:
-    """Validate extracted data for completeness and accuracy"""
+    """Validate business rules for Pydantic-validated health insurance data"""
     
-    def validate(self, extracted_data: Dict[str, Any]) -> Dict[str, Any]:
+    def validate(self, extraction_result: ExtractionResult) -> Dict[str, Any]:
         """
-        Validate extracted data
+        Validate business rules for extracted data
         
         Args:
-            extracted_data: Data from extraction agent
+            extraction_result: Result from ExtractionAgent with Pydantic validation
             
         Returns:
-            Validation result with errors and missing fields
+            Validation result with business rule errors and missing fields
         """
         
         validation_result = {
@@ -35,20 +37,30 @@ class ValidationAgent:
             "suggestions": []
         }
         
+        # Check if extraction was successful
+        if not extraction_result.success or extraction_result.data is None:
+            validation_result["errors"].append(f"Extraction failed: {extraction_result.error}")
+            return validation_result
+        
+        data = extraction_result.data
+        
+        # Convert Pydantic model to dict for existing logic compatibility
+        data_dict = self._pydantic_to_dict(data)
+        
         # Check required fields
-        missing_fields = self._check_required_fields(extracted_data)
+        missing_fields = self._check_required_fields(data_dict)
         validation_result["missing_fields"] = missing_fields
         
-        # Validate field values
-        field_errors = self._validate_field_values(extracted_data)
+        # Validate field values (business logic)
+        field_errors = self._validate_field_values(data_dict)
         validation_result["errors"].extend(field_errors)
         
         # Check count consistency
-        count_errors = self._validate_counts(extracted_data)
+        count_errors = self._validate_counts(data_dict)
         validation_result["count_errors"] = count_errors
         
         # Check family logic
-        family_errors = self._validate_family_logic(extracted_data)
+        family_errors = self._validate_family_logic(data_dict)
         validation_result["errors"].extend(family_errors)
         
         # Generate suggestions for missing data
@@ -63,6 +75,27 @@ class ValidationAgent:
         )
         
         return validation_result
+    
+    def _pydantic_to_dict(self, data: HealthInsuranceRequest) -> Dict[str, Any]:
+        """Convert Pydantic model to dict format for existing validation logic"""
+        result = {}
+        
+        # Basic fields
+        result["username"] = data.username
+        result["numberOfRecords"] = data.numberOfRecords  
+        result["env"] = data.env
+        result["UserType"] = data.UserType
+        result["confidence"] = data.confidence
+        
+        # Distribution fields - convert Pydantic models to dicts
+        result["states"] = [{"state": s.state, "count": s.count} for s in data.states] if data.states else None
+        result["genders"] = [{"gender": g.gender, "count": g.count} for g in data.genders] if data.genders else None
+        result["enrollments"] = [{"name": e.name, "count": e.count} for e in data.enrollments] if data.enrollments else None
+        result["ages"] = [{"age": a.age, "count": a.count} for a in data.ages] if data.ages else None
+        result["children"] = [{"type": c.type, "count": c.count} for c in data.children] if data.children else None
+        result["spouses"] = [{"type": s.type, "count": s.count} for s in data.spouses] if data.spouses else None
+        
+        return result
     
     def _check_required_fields(self, data: Dict[str, Any]) -> List[str]:
         """Check which required fields are missing"""
@@ -79,7 +112,15 @@ class ValidationAgent:
             if value is None or value == "" or value == [] or value == {}:
                 missing.append(field)
         
-        # Conditionally check for children and spouses based on enrollment type
+        # CRITICAL: Only check for family fields if ALL count validations pass
+        # This prevents asking for spouse/children when there are incomplete counts
+        count_errors = self._validate_counts(data)
+        if len(count_errors) > 0:
+            # If there are count errors, don't ask for family fields yet
+            # The user needs to complete the basic distributions first
+            return missing
+        
+        # Only check for family fields if counts are complete and valid
         if data.get("enrollments"):
             has_family_enrollment = False
             has_self_plus_one = False
@@ -91,29 +132,23 @@ class ValidationAgent:
                 if "Self+1" in enrollment_name or "Self + 1" in enrollment_name:
                     has_self_plus_one = True
             
-            # For Self+1: need spouse OR children (at least one)
-            if has_self_plus_one:
-                spouse_value = data.get("spouses")
+            # If ANY family enrollment exists (Self+1 OR Self+Family)
+            if has_family_enrollment or has_self_plus_one:
+                # Children are MANDATORY for family enrollments
                 child_value = data.get("children")
-                spouse_missing = spouse_value is None or spouse_value == "" or spouse_value == [] or spouse_value == {}
                 child_missing = child_value is None or child_value == "" or child_value == [] or child_value == {}
                 
-                # If both are missing, ask for spouse (since it's more common for Self+1)
-                if spouse_missing and child_missing:
-                    missing.append("spouses")
-            
-            # For Self+Family: need both spouse AND children
-            if has_family_enrollment:
+                if child_missing:
+                    missing.append("children")
+                
+                # Spouses: All-or-nothing logic
                 spouse_value = data.get("spouses")
-                child_value = data.get("children")
+                spouse_missing = spouse_value is None or spouse_value == "" or spouse_value == [] or spouse_value == {}
                 
-                if spouse_value is None or spouse_value == "" or spouse_value == [] or spouse_value == {}:
-                    if "spouses" not in missing:
-                        missing.append("spouses")
-                
-                if child_value is None or child_value == "" or child_value == [] or child_value == {}:
-                    if "children" not in missing:
-                        missing.append("children")
+                # If spouses are provided but incomplete, this will be caught by count validation
+                # If spouses are not provided at all, that's OK - we'll auto-fill in JSON generation
+                # We only add "spouses" to missing if we want to ask the user for it
+                # Since spouses are optional, we don't add them to missing fields
         
         return missing
     
@@ -183,10 +218,46 @@ class ValidationAgent:
                 deficit = total_records - age_sum
                 count_errors.append(f"Age counts sum to {age_sum}, need {total_records}. Deficit: {deficit}")
         
+        # Check children counts (only when family enrollments exist)
+        if data.get("children"):
+            # First check if we have any family enrollments
+            has_family_enrollments = False
+            if data.get("enrollments"):
+                for enrollment in data["enrollments"]:
+                    enrollment_name = enrollment.get("name", "")
+                    if "Self+Family" in enrollment_name or "Self + Family" in enrollment_name or "Self+1" in enrollment_name or "Self + 1" in enrollment_name:
+                        has_family_enrollments = True
+                        break
+            
+            # Only validate children counts if family enrollments exist
+            if has_family_enrollments:
+                children_sum = sum(int(c.get("count", 0)) for c in data["children"])
+                if children_sum != total_records:
+                    deficit = total_records - children_sum
+                    count_errors.append(f"Children counts sum to {children_sum}, need {total_records}. Deficit: {deficit}")
+        
+        # Check spouse counts (only when family enrollments exist)
+        if data.get("spouses"):
+            # First check if we have any family enrollments
+            has_family_enrollments = False
+            if data.get("enrollments"):
+                for enrollment in data["enrollments"]:
+                    enrollment_name = enrollment.get("name", "")
+                    if "Self+Family" in enrollment_name or "Self + Family" in enrollment_name or "Self+1" in enrollment_name or "Self + 1" in enrollment_name:
+                        has_family_enrollments = True
+                        break
+            
+            # Only validate spouse counts if family enrollments exist
+            if has_family_enrollments:
+                spouse_sum = sum(int(s.get("count", 0)) for s in data["spouses"])
+                if spouse_sum != total_records:
+                    deficit = total_records - spouse_sum
+                    count_errors.append(f"Spouse counts sum to {spouse_sum}, need {total_records}. Deficit: {deficit}")
+        
         return count_errors
     
     def _validate_family_logic(self, data: Dict[str, Any]) -> List[str]:
-        """Validate family details based on enrollment type"""
+        """Validate family enrollment business rules"""
         errors = []
         
         if not data.get("enrollments"):
@@ -196,18 +267,19 @@ class ValidationAgent:
         has_family_enrollment = False
         for enrollment in data["enrollments"]:
             enrollment_name = enrollment.get("name", "")
-            if "Self + 1" in enrollment_name or "Self + Family" in enrollment_name:
+            if "Self + 1" in enrollment_name or "Self + Family" in enrollment_name or "Self+1" in enrollment_name or "Self+Family" in enrollment_name:
                 has_family_enrollment = True
                 break
         
         if has_family_enrollment:
-            # Family enrollments require dependent age info
+            # For family enrollments: Children are MANDATORY
             if not data.get("children"):
-                errors.append("Family enrollment types require child/dependent information")
-        else:
-            # Self Only enrollments should have EMPTY dependents
-            # This will be handled in JSON generation
-            pass
+                errors.append("Children information is required for Self+1 or Self+Family enrollments")
+            
+            # For family enrollments: Spouses follow all-or-nothing rule
+            # If spouses are provided, they must sum to numberOfRecords (handled by count validation)
+            # If not provided, that's fine - will be auto-filled to EMPTY
+            # No additional validation needed here for spouses
         
         return errors
     
