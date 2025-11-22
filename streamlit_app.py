@@ -46,29 +46,29 @@ def main():
         st.session_state.conversation_history = []
     
     if "accumulated_data" not in st.session_state:
-        st.session_state.accumulated_data = {}
+        st.session_state.accumulated_data = None
     
     if "last_json_result" not in st.session_state:
         st.session_state.last_json_result = None
+    
+    # Initialize workflow with credentials from .env
+    aws_access_key_id = os.getenv("AWS_ACCESS_KEY_ID", "")
+    aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY", "")
+    
+    if aws_access_key_id and aws_secret_access_key and not st.session_state.workflow:
+        try:
+            st.session_state.workflow = ChatbotWorkflow(aws_access_key_id, aws_secret_access_key)
+        except Exception as e:
+            st.error(f"❌ Error initializing chatbot: {e}")
     
     # Sidebar for configuration
     with st.sidebar:
         st.header("Configuration")
         
-        # OpenAI API Key input
-        api_key = st.text_input(
-            "OpenAI API Key",
-            type="password",
-            value=os.getenv("OPENAI_API_KEY", ""),
-            help="Enter your OpenAI API key"
-        )
-        
-        if api_key and not st.session_state.workflow:
-            try:
-                st.session_state.workflow = ChatbotWorkflow(api_key)
-                st.success("✅ Chatbot initialized!")
-            except Exception as e:
-                st.error(f"❌ Error initializing chatbot: {e}")
+        # Reset button to clear session state
+        if st.button("🔄 Reset Session", help="Clear session and force re-initialization"):
+            st.session_state.clear()
+            st.rerun()
         
         # Show last generated file
         if st.session_state.last_json_result and st.session_state.last_json_result.get("success"):
@@ -91,7 +91,7 @@ def main():
     
     # Main chat interface
     if not st.session_state.workflow:
-        st.warning("⚠️ Please enter your OpenAI API key in the sidebar to start")
+        st.warning("⚠️ Please enter your AWS credentials in the sidebar to start using Llama 3.3 70B")
         
         # Show example inputs
         st.header("Example Inputs")
@@ -110,6 +110,11 @@ def main():
     
     # Chat interface
     st.header("Chat")
+    
+    # Show welcome message if no conversation history
+    if len(st.session_state.conversation_history) == 0:
+        with st.chat_message("assistant"):
+            st.write("👋 Hi! I'm your Health Insurance Data Generator Assistant. How can I assist you?")
     
     # Display conversation history
     for message in st.session_state.conversation_history:
@@ -140,7 +145,7 @@ def main():
                     
                     # Update conversation history and accumulated data
                     st.session_state.conversation_history = result["conversation_history"]
-                    st.session_state.accumulated_data = result["extracted_data"]
+                    st.session_state.accumulated_data = result["extraction_result"]
                     
                     # Display bot response
                     st.write(result["follow_up_message"])
@@ -157,7 +162,7 @@ def main():
     # Clear conversation button
     if st.button("🗑️ Clear Conversation"):
         st.session_state.conversation_history = []
-        st.session_state.accumulated_data = {}
+        st.session_state.accumulated_data = None
         st.session_state.last_json_result = None
         st.rerun()
 

@@ -63,12 +63,12 @@ def get_followup_llm(aws_access_key_id: str = None, aws_secret_access_key: str =
     """
     Get LLM optimized for follow-up generation
     - Medium temperature for natural conversation
-    - Lower token limit for concise responses
+    - Higher token limit to support listing all enrollment options (need ~350 tokens for full list)
     """
     return get_bedrock_llm(
         aws_access_key_id=aws_access_key_id,
         aws_secret_access_key=aws_secret_access_key,
-        max_tokens=150,
+        max_tokens=400,
         temperature=0.3,
         top_p=0.8
     )
