@@ -109,19 +109,14 @@ CRITICAL RULES:
 2. Use null for missing fields (NEVER use "UNKNOWN")
 3. Match enrollments to EXACT names from the list below
 4. Be thorough - capture all details
-5. 🚨 ONLY ACCEPT COUNTS (ACTUAL NUMBERS), NEVER PERCENTAGES 🚨
-   - User says "50" or "Male 50" → Extract 50 as count ✓
-   - User says "50%" or "Male 50%" → Set field to null, reject percentages ✗
-   - User says "half" or "split evenly" → Calculate numeric counts and extract ✓
-   - PERCENTAGES ARE NOT ALLOWED - If you see %, ignore that field completely
-   - Only extract DIRECT COUNT NUMBERS (integers like 50, 100, 150)
-6. 🚨 NEVER AUTO-CORRECT OR ADJUST USER'S NUMBERS - Extract EXACTLY What User Types 🚨
-   - User says "over65 80, under65 30" → Extract EXACTLY 80 and 30 (NOT 80 and 20)
-   - User says "minor 50, major 30, newborn 20" → Extract EXACTLY 50, 30, 20 (NOT 50, 30, 70)
+5. ONLY accept COUNTS (direct numbers), NEVER accept percentages
+   - If user provides percentages, set that field to null (they must provide counts)
+   - Only extract if user gives direct count numbers like "Male 60, Female 40"
+6. 🚨 NEVER AUTO-CORRECT OR ADJUST COUNTS - Extract VERBATIM from user input
+   - If user says "over65 80, under65 30", extract EXACTLY 80 and 30 (NOT 80 and 20)
    - DO NOT "fix" counts to match numberOfRecords - NEVER change user's numbers
-   - DO NOT calculate what's "remaining" or "needed" - extract ONLY what user explicitly said
-   - Validation handles count mismatches - your job is ONLY to extract verbatim
-   - Even if counts don't sum correctly, extract EXACTLY what user typed
+   - Validation handles count mismatches - your job is ONLY to extract what user typed
+   - Even if counts don't sum to numberOfRecords, extract EXACTLY what user said
 
 VALID OPTIONS FOR EACH FIELD:
 - States: {valid_states}  
@@ -163,37 +158,23 @@ ENROLLMENT MATCHING RULES:
 
 {format_instructions}
 
-EXTRACTION EXAMPLES (COUNTS ONLY - NO PERCENTAGES EVER):
-
-✓ CORRECT Examples:
+EXTRACTION EXAMPLES (COUNTS ONLY):
 Input: "My name is John, 100 records, California 100, Male 100"
 Output: {{"username": "John", "numberOfRecords": 100, "states": [{{"state": "CA", "count": 100}}], "genders": [{{"gender": "M", "count": 100}}], ...}}
+
+Input: "100 records, 60% male, 40% female"
+Output: {{"numberOfRecords": 100, "genders": null}}  // Percentages NOT accepted, must be counts
 
 Input: "200 records, California 100, Texas 60, Florida 40"
 Output: {{"numberOfRecords": 200, "states": [{{"state": "CA", "count": 100}}, {{"state": "TX", "count": 60}}, {{"state": "FL", "count": 40}}]}}
 
-Input: "over65 80, under65 20"
+Input: "over65 80, under65 20" (VALID options)
 Output: {{"ages": [{{"age": "over65", "count": 80}}, {{"age": "under65", "count": 20}}]}}
 
-Input: "over65 80, under65 30" with numberOfRecords=100
-Output: {{"ages": [{{"age": "over65", "count": 80}}, {{"age": "under65", "count": 30}}]}}
-// ✓ CORRECT: Extracted EXACTLY 80 and 30 as user said (validation will catch sum≠100)
-
-Input: "child minor 50, child major 30, remaining for child newborn" with numberOfRecords=150
-Output: {{"children": [{{"type": "CHILD_MINOR", "count": 50}}, {{"type": "CHILD_MAJOR", "count": 30}}]}}
-// ✓ CORRECT: Extract ONLY explicit numbers (50, 30). DO NOT calculate "remaining". Validation will ask user for the rest.
-
-✗ WRONG Examples (DO NOT DO THIS):
-Input: "100 records, 60% male, 40% female"
-Output: {{"numberOfRecords": 100, "genders": [{{"gender": "M", "count": 60}}, {{"gender": "F", "count": 40}}]}}
-// ❌ WRONG: Accepted percentages. Should be: {{"genders": null}}
-
+WRONG Example (DO NOT DO THIS):
 Input: "over65 80, under65 30" with numberOfRecords=100
 Output: {{"ages": [{{"age": "over65", "count": 80}}, {{"age": "under65", "count": 20}}]}}
-// ❌ WRONG: Changed 30→20 to match numberOfRecords. NEVER adjust user's numbers!
-
-Input: "minor 50, major 30, rest for newborn" with numberOfRecords=150
-Output: {{"children": [{{"type": "CHILD_MINOR", "count": 50}}, {{"type": "CHILD_MAJOR", "count": 30}}, {{"type": "CHILD_NEW_BORN", "count": 70}}]}}
+// ❌ WRONG: Changed 30 to 20 to match numberOfRecords. NEVER do this! Extract exact numbers.
 
 Input: "over69 80" (INVALID - not in valid list)
 Output: {{"ages": null}}  // Reject invalid, system will ask for valid options

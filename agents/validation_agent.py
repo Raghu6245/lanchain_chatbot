@@ -208,7 +208,7 @@ class ValidationAgent:
         return errors
     
     def _validate_counts(self, data: Dict[str, Any]) -> List[str]:
-        """Validate that all counts sum to numberOfRecords (using COUNTS ONLY, never percentages)"""
+        """Validate that all counts sum to numberOfRecords"""
         if not data.get("numberOfRecords"):
             return ["numberOfRecords is required for count validation"]
         
@@ -224,40 +224,28 @@ class ValidationAgent:
             state_sum = sum(int(s.get("count", 0)) for s in data["states"])
             if state_sum != total_records:
                 deficit = total_records - state_sum
-                if deficit > 0:
-                    count_errors.append(f"State counts sum to {state_sum}, but you need {total_records} total. Still need {deficit} more.")
-                else:
-                    count_errors.append(f"State counts sum to {state_sum}, but you only need {total_records} total. You have {abs(deficit)} too many.")
+                count_errors.append(f"State counts sum to {state_sum}, need {total_records}. Deficit: {deficit}")
         
         # Check gender counts
         if data.get("genders"):
             gender_sum = sum(int(g.get("count", 0)) for g in data["genders"])
             if gender_sum != total_records:
                 deficit = total_records - gender_sum
-                if deficit > 0:
-                    count_errors.append(f"Gender counts sum to {gender_sum}, but you need {total_records} total. Still need {deficit} more.")
-                else:
-                    count_errors.append(f"Gender counts sum to {gender_sum}, but you only need {total_records} total. You have {abs(deficit)} too many.")
+                count_errors.append(f"Gender counts sum to {gender_sum}, need {total_records}. Deficit: {deficit}")
         
         # Check enrollment counts
         if data.get("enrollments"):
             enrollment_sum = sum(int(e.get("count", 0)) for e in data["enrollments"])
             if enrollment_sum != total_records:
                 deficit = total_records - enrollment_sum
-                if deficit > 0:
-                    count_errors.append(f"Enrollment counts sum to {enrollment_sum}, but you need {total_records} total. Still need {deficit} more.")
-                else:
-                    count_errors.append(f"Enrollment counts sum to {enrollment_sum}, but you only need {total_records} total. You have {abs(deficit)} too many.")
+                count_errors.append(f"Enrollment counts sum to {enrollment_sum}, need {total_records}. Deficit: {deficit}")
         
         # Check age counts
         if data.get("ages"):
             age_sum = sum(int(a.get("count", 0)) for a in data["ages"])
             if age_sum != total_records:
                 deficit = total_records - age_sum
-                if deficit > 0:
-                    count_errors.append(f"Age counts sum to {age_sum}, but you need {total_records} total. Still need {deficit} more.")
-                else:
-                    count_errors.append(f"Age counts sum to {age_sum}, but you only need {total_records} total. You have {abs(deficit)} too many.")
+                count_errors.append(f"Age counts sum to {age_sum}, need {total_records}. Deficit: {deficit}")
         
         # Check children counts (only when family enrollments exist)
         if data.get("children"):
@@ -275,10 +263,7 @@ class ValidationAgent:
                 children_sum = sum(int(c.get("count", 0)) for c in data["children"])
                 if children_sum != total_records:
                     deficit = total_records - children_sum
-                    if deficit > 0:
-                        count_errors.append(f"Children counts sum to {children_sum}, but you need {total_records} total. Still need {deficit} more.")
-                    else:
-                        count_errors.append(f"Children counts sum to {children_sum}, but you only need {total_records} total. You have {abs(deficit)} too many.")
+                    count_errors.append(f"Children counts sum to {children_sum}, need {total_records}. Deficit: {deficit}")
         
         # Check spouse counts (only when family enrollments exist)
         if data.get("spouses"):
@@ -296,10 +281,7 @@ class ValidationAgent:
                 spouse_sum = sum(int(s.get("count", 0)) for s in data["spouses"])
                 if spouse_sum != total_records:
                     deficit = total_records - spouse_sum
-                    if deficit > 0:
-                        count_errors.append(f"Spouse counts sum to {spouse_sum}, but you need {total_records} total. Still need {deficit} more.")
-                    else:
-                        count_errors.append(f"Spouse counts sum to {spouse_sum}, but you only need {total_records} total. You have {abs(deficit)} too many.")
+                    count_errors.append(f"Spouse counts sum to {spouse_sum}, need {total_records}. Deficit: {deficit}")
         
         return count_errors
     
